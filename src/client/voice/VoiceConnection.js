@@ -246,8 +246,8 @@ class VoiceConnection extends EventEmitter {
    *  })
    *  .catch(console.error);
    */
-  playStream(stream, { seek = 0, volume = 1, passes = 1 } = {}) {
-    const options = { seek, volume, passes };
+  playStream(stream, { seek = 0, volume = 1, passes = 1, tempo = 1 } = {}) {
+    const options = { seek, volume, passes, tempo };
     return this.player.playUnknownStream(stream, options);
   }
 
