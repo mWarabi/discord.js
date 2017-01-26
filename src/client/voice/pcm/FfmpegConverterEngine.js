@@ -60,7 +60,7 @@ class FfmpegConverterEngine extends ConverterEngine {
       '-ar', '48000',
       '-ac', '2',
       '-ss', String(seek),
-      '-atempo', String(tempo),
+      '-af', `atempo=${String(tempo)}`,
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'ignore'] });
     return new PCMConversionProcess(encoder);
