@@ -43,6 +43,7 @@ class AudioPlayer extends EventEmitter {
     stream.on('error', e => this.emit('error', e));
     const conversionProcess = this.audioToPCM.createConvertStream(options.seek, options.tempo, options.pitch);
     conversionProcess.on('error', e => this.emit('error', e));
+    conversionProcess.on('exit', e => this.emit('exit', e));
     conversionProcess.setInput(stream);
     return this.playPCMStream(conversionProcess.process.stdout, conversionProcess, options);
   }
@@ -68,6 +69,7 @@ class AudioPlayer extends EventEmitter {
     stream.on('error', e => this.emit('error', e));
     const dispatcher = new StreamDispatcher(this, stream, this.streamingData, options);
     dispatcher.on('error', e => this.emit('error', e));
+    dispatcher.on('exit', e => this.emit('exit', e));
     dispatcher.on('end', () => this.cleanup(dispatcher.stream, 'dispatcher ended'));
     dispatcher.on('speaking', value => this.voiceConnection.setSpeaking(value));
     this.dispatcher = dispatcher;

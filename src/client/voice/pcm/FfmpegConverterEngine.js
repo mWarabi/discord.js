@@ -8,6 +8,7 @@ class PCMConversionProcess extends EventEmitter {
     this.process = process;
     this.input = null;
     this.process.on('error', e => this.emit('error', e));
+    this.process.on('exit', e => this.emit('exit', e));
   }
 
   setInput(stream) {
