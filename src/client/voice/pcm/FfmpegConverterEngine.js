@@ -63,7 +63,7 @@ class FfmpegConverterEngine extends ConverterEngine {
       '-af', `atempo=${String(tempo)}`,
     ];
     if (bass) {
-      option.push('-af', `bass=g=5`);
+      option.push('-af', `bass=g=20`);
     }
     option.push('pipe:1');
     const encoder = ChildProcess.spawn(this.command, option, { stdio: ['pipe', 'pipe', 'ignore'] });
