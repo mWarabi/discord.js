@@ -50,7 +50,7 @@ class FfmpegConverterEngine extends ConverterEngine {
     this.emit('error', err);
   }
 
-  createConvertStream(seek = 0, tempo = 1, bass = false) {
+  createConvertStream(seek = 0, tempo = 1, pitch = 44100) {
     super.createConvertStream();
     const option = [
       '-analyzeduration', '0',
@@ -61,11 +61,9 @@ class FfmpegConverterEngine extends ConverterEngine {
       '-ac', '2',
       '-ss', String(seek),
       '-af', `atempo=${String(tempo)}`,
+      '-af', `asetrate=${String(pitch)}`,
+      'pipe:1',
     ];
-    if (bass) {
-      option.push('-af', `asetrate=33075`);
-    }
-    option.push('pipe:1');
     const encoder = ChildProcess.spawn(this.command, option, { stdio: ['pipe', 'pipe', 'ignore'] });
     return new PCMConversionProcess(encoder);
   }

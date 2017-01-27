@@ -35,13 +35,13 @@ class AudioPlayer extends EventEmitter {
     this.voiceConnection.on('closing', () => this.cleanup(null, 'voice connection closing'));
   }
 
-  playUnknownStream(stream, { seek = 0, volume = 1, passes = 1, tempo = 1, bass = false } = {}) {
-    const options = { seek, volume, passes, tempo, bass };
+  playUnknownStream(stream, { seek = 0, volume = 1, passes = 1, tempo = 1, pitch = 44100 } = {}) {
+    const options = { seek, volume, passes, tempo, pitch };
     stream.on('end', () => {
       this.emit('debug', 'Input stream to converter has ended');
     });
     stream.on('error', e => this.emit('error', e));
-    const conversionProcess = this.audioToPCM.createConvertStream(options.seek, options.tempo, options.bass);
+    const conversionProcess = this.audioToPCM.createConvertStream(options.seek, options.tempo, options.pitch);
     conversionProcess.on('error', e => this.emit('error', e));
     conversionProcess.setInput(stream);
     return this.playPCMStream(conversionProcess.process.stdout, conversionProcess, options);
@@ -57,8 +57,8 @@ class AudioPlayer extends EventEmitter {
     }
   }
 
-  playPCMStream(stream, converter, { seek = 0, volume = 1, passes = 1, tempo = 1, bass = false } = {}) {
-    const options = { seek, volume, passes, tempo, bass };
+  playPCMStream(stream, converter, { seek = 0, volume = 1, passes = 1 } = {}) {
+    const options = { seek, volume, passes };
     stream.on('end', () => this.emit('debug', 'PCM input stream ended'));
     this.cleanup(null, 'outstanding play stream');
     this.currentConverter = converter;
