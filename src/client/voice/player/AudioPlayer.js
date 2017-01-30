@@ -103,24 +103,6 @@ class AudioPlayer extends EventEmitter {
     return dispatcher;
   }
 
-<<<<<<< HEAD
-  playPCMStream(stream, converter, { seek = 0, volume = 1, passes = 1 } = {}) {
-    const options = { seek, volume, passes };
-    stream.on('end', () => this.emit('debug', 'PCM input stream ended'));
-    this.cleanup(null, 'outstanding play stream');
-    this.currentConverter = converter;
-    if (this.dispatcher) {
-      this.streamingData = this.dispatcher.streamingData;
-    }
-    stream.on('error', e => this.emit('error', e));
-    const dispatcher = new StreamDispatcher(this, stream, this.streamingData, options);
-    dispatcher.on('error', e => this.emit('error', e));
-    dispatcher.on('exit', e => this.emit('exit', e));
-    dispatcher.on('end', () => this.cleanup(dispatcher.stream, 'dispatcher ended'));
-    dispatcher.on('speaking', value => this.voiceConnection.setSpeaking(value));
-    this.dispatcher = dispatcher;
-    dispatcher.on('debug', m => this.emit('debug', `Stream dispatch - ${m}`));
-=======
   playOpusStream(stream, { seek = 0, passes = 1 } = {}) {
     const options = { seek, passes, opus: true };
     this.destroyAllStreams(stream);
@@ -135,7 +117,6 @@ class AudioPlayer extends EventEmitter {
     const dispatcher = this.createDispatcher(broadcast, options);
     this.streams.set(broadcast, { dispatcher, input: broadcast });
     broadcast.registerDispatcher(dispatcher);
->>>>>>> hydrabolt/indev-prism
     return dispatcher;
   }
 
