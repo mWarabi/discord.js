@@ -1,6 +1,7 @@
 const TextBasedChannel = require('./interface/TextBasedChannel');
 const Constants = require('../util/Constants');
 const Presence = require('./Presence').Presence;
+const Snowflake = require('../util/Snowflake');
 
 /**
  * Represents a user on Discord.
@@ -76,7 +77,7 @@ class User {
    * @readonly
    */
   get createdTimestamp() {
-    return (this.id / 4194304) + 1420070400000;
+    return Snowflake.deconstruct(this.id).timestamp;
   }
 
   /**
@@ -108,7 +109,7 @@ class User {
    */
   get avatarURL() {
     if (!this.avatar) return null;
-    return Constants.Endpoints.avatar(this.id, this.avatar);
+    return Constants.Endpoints.User(this).Avatar(this.client.options.http.cdn, this.avatar);
   }
 
   /**
@@ -119,7 +120,7 @@ class User {
   get defaultAvatarURL() {
     const avatars = Object.keys(Constants.DefaultAvatars);
     const avatar = avatars[this.discriminator % avatars.length];
-    return Constants.Endpoints.assets(`${Constants.DefaultAvatars[avatar]}.png`);
+    return Constants.Endpoints.CDN(this.client.options.http.host).Asset(`${Constants.DefaultAvatars[avatar]}.png`);
   }
 
   /**
@@ -129,6 +130,15 @@ class User {
    */
   get displayAvatarURL() {
     return this.avatarURL || this.defaultAvatarURL;
+  }
+
+  /**
+   * The discord "tag" for this user
+   * @type {string}
+   * @readonly
+   */
+  get tag() {
+    return `${this.username}#${this.discriminator}`;
   }
 
   /**
@@ -174,9 +184,18 @@ class User {
   /**
    * The DM between the client's user and this user
    * @type {?DMChannel}
+   * @readonly
    */
   get dmChannel() {
     return this.client.channels.filter(c => c.type === 'dm').find(c => c.recipient.id === this.id);
+  }
+
+  /**
+   * Creates a DM channel between the client and the user
+   * @returns {Promise<DMChannel>}
+   */
+  createDM() {
+    return this.client.rest.methods.createDM(this);
   }
 
   /**
@@ -271,11 +290,12 @@ class User {
   }
 
   // These are here only for documentation purposes - they are implemented by TextBasedChannel
-  send() { return; }
-  sendMessage() { return; }
-  sendEmbed() { return; }
-  sendFile() { return; }
-  sendCode() { return; }
+  /* eslint-disable no-empty-function */
+  send() {}
+  sendMessage() {}
+  sendEmbed() {}
+  sendFile() {}
+  sendCode() {}
 }
 
 TextBasedChannel.applyToClass(User);

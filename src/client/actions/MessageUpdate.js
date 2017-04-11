@@ -1,6 +1,5 @@
 const Action = require('./Action');
 const Constants = require('../../util/Constants');
-const cloneObject = require('../../util/CloneObject');
 
 class MessageUpdateAction extends Action {
   handle(data) {
@@ -10,12 +9,10 @@ class MessageUpdateAction extends Action {
     if (channel) {
       const message = channel.messages.get(data.id);
       if (message) {
-        const oldMessage = cloneObject(message);
         message.patch(data);
-        message._edits.unshift(oldMessage);
-        client.emit(Constants.Events.MESSAGE_UPDATE, oldMessage, message);
+        client.emit(Constants.Events.MESSAGE_UPDATE, message._edits[0], message);
         return {
-          old: oldMessage,
+          old: message._edits[0],
           updated: message,
         };
       }

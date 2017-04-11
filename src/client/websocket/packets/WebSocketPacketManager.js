@@ -16,6 +16,7 @@ class WebSocketPacketManager {
     this.queue = [];
 
     this.register(Constants.WSEvents.READY, require('./handlers/Ready'));
+    this.register(Constants.WSEvents.RESUMED, require('./handlers/Resumed'));
     this.register(Constants.WSEvents.GUILD_CREATE, require('./handlers/GuildCreate'));
     this.register(Constants.WSEvents.GUILD_DELETE, require('./handlers/GuildDelete'));
     this.register(Constants.WSEvents.GUILD_UPDATE, require('./handlers/GuildUpdate'));
@@ -36,6 +37,7 @@ class WebSocketPacketManager {
     this.register(Constants.WSEvents.PRESENCE_UPDATE, require('./handlers/PresenceUpdate'));
     this.register(Constants.WSEvents.USER_UPDATE, require('./handlers/UserUpdate'));
     this.register(Constants.WSEvents.USER_NOTE_UPDATE, require('./handlers/UserNoteUpdate'));
+    this.register(Constants.WSEvents.USER_SETTINGS_UPDATE, require('./handlers/UserSettingsUpdate'));
     this.register(Constants.WSEvents.VOICE_STATE_UPDATE, require('./handlers/VoiceStateUpdate'));
     this.register(Constants.WSEvents.TYPING_START, require('./handlers/TypingStart'));
     this.register(Constants.WSEvents.MESSAGE_CREATE, require('./handlers/MessageCreate'));
@@ -78,6 +80,7 @@ class WebSocketPacketManager {
     }
 
     if (packet.op === Constants.OPCodes.INVALID_SESSION) {
+      this.client.emit('debug', `SESSION INVALID! Waiting to reconnect: ${packet.d}`);
       if (packet.d) {
         setTimeout(() => {
           this.ws._sendResume();

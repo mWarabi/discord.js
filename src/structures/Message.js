@@ -1,9 +1,11 @@
+const Mentions = require('./MessageMentions');
 const Attachment = require('./MessageAttachment');
 const Embed = require('./MessageEmbed');
 const MessageReaction = require('./MessageReaction');
+const Util = require('../util/Util');
 const Collection = require('../util/Collection');
 const Constants = require('../util/Constants');
-const escapeMarkdown = require('../util/EscapeMarkdown');
+const Permissions = require('../util/Permissions');
 let GuildMember;
 
 /**
@@ -56,7 +58,7 @@ class Message {
     /**
      * Represents the author of the message as a guild member. Only available if the message comes from a guild
      * where the author is still a member.
-     * @type {GuildMember}
+     * @type {?GuildMember}
      */
     this.member = this.guild ? this.guild.member(this.author) || null : null;
 
@@ -110,60 +112,22 @@ class Message {
     this.editedTimestamp = data.edited_timestamp ? new Date(data.edited_timestamp).getTime() : null;
 
     /**
-     * An object containing a further users, roles or channels collections
-     * @type {Object}
-     * @property {Collection<Snowflake, User>} mentions.users Mentioned users, maps their ID to the user object.
-     * @property {Collection<Snowflake, Role>} mentions.roles Mentioned roles, maps their ID to the role object.
-     * @property {Collection<Snowflake, GuildChannel>} mentions.channels Mentioned channels,
-     * maps their ID to the channel object.
-     * @property {boolean} mentions.everyone Whether or not @everyone was mentioned.
-     */
-    this.mentions = {
-      users: new Collection(),
-      roles: new Collection(),
-      channels: new Collection(),
-      everyone: data.mention_everyone,
-    };
-
-    for (const mention of data.mentions) {
-      let user = this.client.users.get(mention.id);
-      if (user) {
-        this.mentions.users.set(user.id, user);
-      } else {
-        user = this.client.dataManager.newUser(mention);
-        this.mentions.users.set(user.id, user);
-      }
-    }
-
-    if (data.mention_roles) {
-      for (const mention of data.mention_roles) {
-        const role = this.channel.guild.roles.get(mention);
-        if (role) this.mentions.roles.set(role.id, role);
-      }
-    }
-
-    if (this.channel.guild) {
-      const channMentionsRaw = data.content.match(/<#([0-9]{14,20})>/g) || [];
-      for (const raw of channMentionsRaw) {
-        const chan = this.channel.guild.channels.get(raw.match(/([0-9]{14,20})/g)[0]);
-        if (chan) this.mentions.channels.set(chan.id, chan);
-      }
-    }
-
-    this._edits = [];
-
-    /**
      * A collection of reactions to this message, mapped by the reaction "id".
-     * @type {Collection<Snowflake|string, MessageReaction>}
+     * @type {Collection<Snowflake, MessageReaction>}
      */
     this.reactions = new Collection();
-
     if (data.reactions && data.reactions.length > 0) {
       for (const reaction of data.reactions) {
         const id = reaction.emoji.id ? `${reaction.emoji.name}:${reaction.emoji.id}` : reaction.emoji.name;
         this.reactions.set(id, new MessageReaction(this, reaction.emoji, reaction.count, reaction.me));
       }
     }
+
+    /**
+     * All valid mentions that the message contains
+     * @type {MessageMentions}
+     */
+    this.mentions = new Mentions(this, data.mentions, data.mention_roles, data.mention_everyone);
 
     /**
      * ID of the webhook that sent the message, if applicable
@@ -176,66 +140,44 @@ class Message {
      * @type {?boolean}
      */
     this.hit = typeof data.hit === 'boolean' ? data.hit : null;
+
+    /**
+     * The previous versions of the message, sorted with the most recent first
+     * @type {Message[]}
+     * @private
+     */
+    this._edits = [];
   }
 
-  patch(data) { // eslint-disable-line complexity
-    if (data.author) {
-      this.author = this.client.users.get(data.author.id);
-      if (this.guild) this.member = this.guild.member(this.author);
-    }
-    if (data.content) this.content = data.content;
-    if (data.timestamp) this.createdTimestamp = new Date(data.timestamp).getTime();
-    if (data.edited_timestamp) {
-      this.editedTimestamp = data.edited_timestamp ? new Date(data.edited_timestamp).getTime() : null;
-    }
+  /**
+   * Updates the message
+   * @param {Object} data Raw Discord message update data
+   * @private
+   */
+  patch(data) {
+    const clone = Util.cloneObject(this);
+    this._edits.unshift(clone);
+
+    this.editedTimestamp = data.edited_timestamp;
+    if ('content' in data) this.content = data.content;
+    if ('pinned' in data) this.pinned = data.pinned;
     if ('tts' in data) this.tts = data.tts;
-    if ('mention_everyone' in data) this.mentions.everyone = data.mention_everyone;
-    if (data.nonce) this.nonce = data.nonce;
-    if (data.embeds) this.embeds = data.embeds.map(e => new Embed(this, e));
-    if (data.type > -1) {
-      this.system = false;
-      if (data.type === 6) this.system = true;
-    }
-    if (data.attachments) {
+    if ('embeds' in data) this.embeds = data.embeds.map(e => new Embed(this, e));
+    else this.embeds = this.embeds.slice();
+
+    if ('attachments' in data) {
       this.attachments = new Collection();
-      for (const attachment of data.attachments) {
-        this.attachments.set(attachment.id, new Attachment(this, attachment));
-      }
+      for (const attachment of data.attachments) this.attachments.set(attachment.id, new Attachment(this, attachment));
+    } else {
+      this.attachments = new Collection(this.attachments);
     }
-    if (data.mentions) {
-      for (const mention of data.mentions) {
-        let user = this.client.users.get(mention.id);
-        if (user) {
-          this.mentions.users.set(user.id, user);
-        } else {
-          user = this.client.dataManager.newUser(mention);
-          this.mentions.users.set(user.id, user);
-        }
-      }
-    }
-    if (data.mention_roles) {
-      for (const mention of data.mention_roles) {
-        const role = this.channel.guild.roles.get(mention);
-        if (role) this.mentions.roles.set(role.id, role);
-      }
-    }
-    if (data.id) this.id = data.id;
-    if (this.channel.guild && data.content) {
-      const channMentionsRaw = data.content.match(/<#([0-9]{14,20})>/g) || [];
-      for (const raw of channMentionsRaw) {
-        const chan = this.channel.guild.channels.get(raw.match(/([0-9]{14,20})/g)[0]);
-        if (chan) this.mentions.channels.set(chan.id, chan);
-      }
-    }
-    if (data.reactions) {
-      this.reactions = new Collection();
-      if (data.reactions.length > 0) {
-        for (const reaction of data.reactions) {
-          const id = reaction.emoji.id ? `${reaction.emoji.name}:${reaction.emoji.id}` : reaction.emoji.name;
-          this.reactions.set(id, new MessageReaction(this, reaction.emoji, reaction.count, reaction.me));
-        }
-      }
-    }
+
+    this.mentions = new Mentions(
+      this,
+      'mentions' in data ? data.mentions : this.mentions.users,
+      'mentions_roles' in data ? data.mentions_roles : this.mentions.roles,
+      'mention_everyone' in data ? data.mention_everyone : this.mentions.everyone
+    );
   }
 
   /**
@@ -274,7 +216,7 @@ class Message {
   get cleanContent() {
     return this.content
       .replace(/@(everyone|here)/g, '@\u200b$1')
-      .replace(/<@!?[0-9]+>/g, (input) => {
+      .replace(/<@!?[0-9]+>/g, input => {
         const id = input.replace(/<|!|>|@/g, '');
         if (this.channel.type === 'dm' || this.channel.type === 'group') {
           return this.client.users.has(id) ? `@${this.client.users.get(id).username}` : input;
@@ -290,12 +232,12 @@ class Message {
           return input;
         }
       })
-      .replace(/<#[0-9]+>/g, (input) => {
+      .replace(/<#[0-9]+>/g, input => {
         const channel = this.client.channels.get(input.replace(/<|#|>/g, ''));
         if (channel) return `#${channel.name}`;
         return input;
       })
-      .replace(/<@&[0-9]+>/g, (input) => {
+      .replace(/<@&[0-9]+>/g, input => {
         if (this.channel.type === 'dm' || this.channel.type === 'group') return input;
         const role = this.guild.roles.get(input.replace(/<|@|>|&/g, ''));
         if (role) return `@${role.name}`;
@@ -331,7 +273,7 @@ class Message {
    */
   get deletable() {
     return this.author.id === this.client.user.id || (this.guild &&
-      this.channel.permissionsFor(this.client.user).hasPermission(Constants.PermissionFlags.MANAGE_MESSAGES)
+      this.channel.permissionsFor(this.client.user).hasPermission(Permissions.FLAGS.MANAGE_MESSAGES)
     );
   }
 
@@ -342,7 +284,7 @@ class Message {
    */
   get pinnable() {
     return !this.guild ||
-      this.channel.permissionsFor(this.client.user).hasPermission(Constants.PermissionFlags.MANAGE_MESSAGES);
+      this.channel.permissionsFor(this.client.user).hasPermission(Permissions.FLAGS.MANAGE_MESSAGES);
   }
 
   /**
@@ -406,7 +348,7 @@ class Message {
    * @returns {Promise<Message>}
    */
   editCode(lang, content) {
-    content = escapeMarkdown(this.client.resolver.resolveString(content), true);
+    content = Util.escapeMarkdown(this.client.resolver.resolveString(content), true);
     return this.edit(`\`\`\`${lang || ''}\n${content}\n\`\`\``);
   }
 
@@ -487,6 +429,15 @@ class Message {
       options = {};
     }
     return this.channel.send(content, Object.assign(options, { reply: this.member || this.author }));
+  }
+
+  /**
+   * Marks the message as read
+   * <warn>This is only available when using a user account.</warn>
+   * @returns {Promise<Message>}
+   */
+  acknowledge() {
+    return this.client.rest.methods.ackMessage(this);
   }
 
   /**

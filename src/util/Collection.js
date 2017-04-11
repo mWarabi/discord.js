@@ -210,7 +210,6 @@ class Collection extends Map {
    * }
    */
   exists(prop, value) {
-    if (prop === 'id') throw new RangeError('Don\'t use .exists() with IDs. Instead, use .has(id).');
     return Boolean(this.find(prop, value));
   }
 
@@ -320,14 +319,22 @@ class Collection extends Map {
   }
 
   /**
+   * Creates an identical shallow copy of this collection.
+   * @returns {Collection}
+   * @example const newColl = someColl.clone();
+   */
+  clone() {
+    return new this.constructor(this);
+  }
+
+  /**
    * Combines this collection with others into a new collection. None of the source collections are modified.
    * @param {...Collection} collections Collections to merge
    * @returns {Collection}
    * @example const newColl = someColl.concat(someOtherColl, anotherColl, ohBoyAColl);
    */
   concat(...collections) {
-    const newColl = new this.constructor();
-    for (const [key, val] of this) newColl.set(key, val);
+    const newColl = this.clone();
     for (const coll of collections) {
       for (const [key, val] of coll) newColl.set(key, val);
     }
@@ -361,6 +368,18 @@ class Collection extends Map {
       const testVal = collection.get(key);
       return testVal !== value || (testVal === undefined && !collection.has(key));
     });
+  }
+
+  /**
+   * The sort() method sorts the elements of a collection in place and returns the collection.
+   * The sort is not necessarily stable. The default sort order is according to string Unicode code points.
+   * @param {Function} [compareFunction] Specifies a function that defines the sort order.
+   * if omitted, the collection is sorted according to each character's Unicode code point value,
+   * according to the string conversion of each element.
+   * @returns {Collection}
+   */
+  sort(compareFunction = (x, y) => +(x > y) || +(x === y) - 1) {
+    return new Collection(Array.from(this.entries()).sort((a, b) => compareFunction(a[1], b[1], a[0], b[0])));
   }
 }
 
